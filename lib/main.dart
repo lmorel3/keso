@@ -1,8 +1,15 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
-import 'package:keso/review.dart';
+import 'package:http/http.dart' as http;
+import 'package:keso/data/database.dart';
+import 'package:keso/ui/review.dart';
+import 'package:keso/ui/search.dart';
 
 import 'model/author.dart';
 import 'model/book.dart';
+import 'ui/edition.dart';
 
 void main() => runApp(MyApp());
 
@@ -39,51 +46,66 @@ class MyHomePage extends StatefulWidget {
 
 }
 
-const List<Book> books = <Book> [
-  const Book(id: 1, title: 'Mon livre', cover: 'https://books.google.fr/books/content?id=QE_CDQAAQBAJ&printsec=frontcover&img=1&zoom=5&edge=curl&imgtk=AFLRE71VkEaCjrBgjTbplKhXpbJ40n9XvDk3XjqNJFQuVyzguulgF2qAL7deTNUnN1HsKfhMGbH3K9SRbugPb6N2lrsKgMzLTLmdC3IitDx8uwNMmNpu0PDVfDWDgYUGARGCNErgvgqV', author: Author(name: 'Auteur'), rating: 5, review: "Salut"),
-  const Book(id: 1, title: 'Mon livre', cover: 'https://books.google.fr/books/content?id=QE_CDQAAQBAJ&printsec=frontcover&img=1&zoom=5&edge=curl&imgtk=AFLRE71VkEaCjrBgjTbplKhXpbJ40n9XvDk3XjqNJFQuVyzguulgF2qAL7deTNUnN1HsKfhMGbH3K9SRbugPb6N2lrsKgMzLTLmdC3IitDx8uwNMmNpu0PDVfDWDgYUGARGCNErgvgqV', author: Author(name: 'Auteur'), rating: 5, review: "Salut"),
-  const Book(id: 1, title: 'Mon livre', cover: 'https://books.google.fr/books/content?id=QE_CDQAAQBAJ&printsec=frontcover&img=1&zoom=5&edge=curl&imgtk=AFLRE71VkEaCjrBgjTbplKhXpbJ40n9XvDk3XjqNJFQuVyzguulgF2qAL7deTNUnN1HsKfhMGbH3K9SRbugPb6N2lrsKgMzLTLmdC3IitDx8uwNMmNpu0PDVfDWDgYUGARGCNErgvgqV', author: Author(name: 'Auteur'), rating: 5, review: "Salut"),
-  const Book(id: 1, title: 'Mon livre', cover: 'https://books.google.fr/books/content?id=QE_CDQAAQBAJ&printsec=frontcover&img=1&zoom=5&edge=curl&imgtk=AFLRE71VkEaCjrBgjTbplKhXpbJ40n9XvDk3XjqNJFQuVyzguulgF2qAL7deTNUnN1HsKfhMGbH3K9SRbugPb6N2lrsKgMzLTLmdC3IitDx8uwNMmNpu0PDVfDWDgYUGARGCNErgvgqV', author: Author(name: 'Auteur'), rating: 5, review: "Salut"),
-  const Book(id: 1, title: 'Mon livre', cover: 'https://books.google.fr/books/content?id=QE_CDQAAQBAJ&printsec=frontcover&img=1&zoom=5&edge=curl&imgtk=AFLRE71VkEaCjrBgjTbplKhXpbJ40n9XvDk3XjqNJFQuVyzguulgF2qAL7deTNUnN1HsKfhMGbH3K9SRbugPb6N2lrsKgMzLTLmdC3IitDx8uwNMmNpu0PDVfDWDgYUGARGCNErgvgqV', author: Author(name: 'Auteur'), rating: 5, review: "Salut"),
-];
-
 class _MyHomePageState extends State<MyHomePage> {
 
-  void _incrementCounter() {
-    setState(() {
-    });
+  void _openEdition(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => SearchPage()),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
+    var futureBuilder = new FutureBuilder(
+      future: BookDatabase.get().getBooks(),
+      builder: (BuildContext context, AsyncSnapshot<List<Book>> snapshot) {
+        print(context); print(snapshot);
+        switch (snapshot.connectionState) {
+          case ConnectionState.none:
+          case ConnectionState.waiting:
+            return new Text('loading...');
+          default:
+            if (snapshot.hasError)
+              return new Text('Error: ${snapshot.error}');
+            else
+              return createListView(context, snapshot);
+        }
+      },
+    );
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.title),
+    return new Scaffold(
+      appBar: new AppBar(
+        title: new Text("Home Page"),
       ),
-      body: GridView.count(
-          crossAxisCount: 3,
-          children: List.generate(books.length, (index) {
-            return Center(
-              child: BookItem(book: books[index])
-            );
-          })
-      ),
+      body: futureBuilder,
       floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
+        onPressed: () { _openEdition(context); },
         tooltip: 'Increment',
         child: Icon(Icons.add),
       ),
     );
   }
+
+  Widget createListView(BuildContext context, AsyncSnapshot<List<Book>> snapshot) {
+    List<Book> values = snapshot.data;
+    return new ListView.builder(
+      itemCount: values.length,
+      itemBuilder: (BuildContext context, int index) {
+        return Center(
+            child: BookItem(book: values[index])
+        );
+      },
+    );
+  }
+
 }
 
 class BookItem extends StatelessWidget {
   const BookItem({Key key, this.book}) : super(key: key);
   final Book book;
 
-  void openReview(BuildContext context) {
+  void _openReview(BuildContext context) {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => ReviewPage(book: this.book)),
@@ -95,7 +117,7 @@ class BookItem extends StatelessWidget {
     final TextStyle titleStyle = Theme.of(context).textTheme.body1;
     final TextStyle authorStyle = Theme.of(context).textTheme.caption;
     return InkWell(
-        onTap: () { openReview(context); },
+        onTap: () { _openReview(context); },
         child: Center(child: Column(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
